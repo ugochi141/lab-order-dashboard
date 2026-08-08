@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Order Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --secondary-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+            --dark-text: #343a40;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), #004d99);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .metric-card {
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-received { background-color: #e3f2fd; color: #1976d2; }
+        .status-processing { background-color: #fff3e0; color: #f57c00; }
+        .status-completed { background-color: #e8f5e8; color: #388e3c; }
+        .status-reported { background-color: #f3e5f5; color: #7b1fa2; }
+        .status-cancelled { background-color: #ffebee; color: #d32f2f; }
+
+        .priority-stat { background-color: #ffcdd2; color: #c62828; }
+        .priority-urgent { background-color: #ffe0b2; color: #ef6c00; }
+        .priority-routine { background-color: #c8e6c9; color: #2e7d32; }
+
+        .table th {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+
+        .sidebar {
+            background-color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            height: fit-content;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255,255,255,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert-dismissible .btn-close {
+            padding: 0.75rem 1rem;
+        }
+
+        .nav-pills .nav-link.active {
+            background-color: var(--primary-color);
+        }
+
+        .nav-pills .nav-link {
+            color: var(--primary-color);
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
+        }
+
+        .critical-alert {
+            background-color: #fff5f5;
+            border-left: 4px solid var(--danger-color);
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading">
+        <div class="text-center">
+            <div class="loading-spinner"></div>
+            <div class="mt-3">Loading Lab Order Dashboard...</div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-flask me-2"></i>Lab Order Dashboard
+            </a>
+            <div class="navbar-nav">
+                <span class="navbar-text">
+                    <i class="fas fa-user me-1"></i>Dr. Smith
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Alert Messages -->
+        <div id="alerts"></div>
+
+        <!-- Tab Navigation -->
+        <ul class="nav nav-pills mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="pill" data-bs-target="#dashboard" 
+                        type="button" role="tab" aria-controls="dashboard" aria-selected="true">
+                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="orders-tab" data-bs-toggle="pill" data-bs-target="#orders" 
+                        type="button" role="tab" aria-controls="orders" aria-selected="false">
+                    <i class="fas fa-list me-2"></i>Lab Orders
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="create-tab" data-bs-toggle="pill" data-bs-target="#create" 
+                        type="button" role="tab" aria-controls="create" aria-selected="false">
+                    <i class="fas fa-plus me-2"></i>New Order
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="analytics-tab" data-bs-toggle="pill" data-bs-target="#analytics" 
+                        type="button" role="tab" aria-controls="analytics" aria-selected="false">
+                    <i class="fas fa-chart-bar me-2"></i>Analytics
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="mainTabsContent">
+            <!-- Dashboard Tab -->
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+                <!-- Key Metrics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-primary" id="totalOrders">0</div>
+                            <div class="metric-label">Total Orders</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-success" id="completedOrders">0</div>
+                            <div class="metric-label">Completed</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-warning" id="pendingOrders">0</div>
+                            <div class="metric-label">Pending</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-danger" id="criticalAlerts">0</div>
+                            <div class="metric-label">Critical Alerts</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Recent Orders -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-clock me-2"></i>Recent Lab Orders
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Order ID</th>
+                                                <th>Patient</th>
+                                                <th>Test</th>
+                                                <th>Priority</th>
+                                                <th>Status</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recentOrdersTable">
+                                            <!-- Recent orders will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-pie me-2"></i>Quick Stats
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="statusChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Critical Alerts -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>Critical Value Alerts
+                                </h5>
+                            </div>
+                            <div class="card-body" id="criticalAlertsSection">
+                                <!-- Critical alerts will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lab Orders Tab -->
+            <div class="tab-pane fade" id="orders" role="tabpanel" aria-labelledby="orders-tab">
+                <div class="row">
+                    <!-- Filters Sidebar -->
+                    <div class="col-md-3">
+                        <div class="sidebar">
+                            <h5><i class="fas fa-filter me-2"></i>Filters</h5>
+                            
+                            <div class="mb-3">
+                                <label for="statusFilter" class="form-label">Status</label>
+                                <select class="form-select" id="statusFilter">
+                                    <option value="">All Statuses</option>
+                                    <option value="received">Received</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="reported">Reported</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="priorityFilter" class="form-label">Priority</label>
+                                <select class="form-select" id="priorityFilter">
+                                    <option value="">All Priorities</option>
+                                    <option value="STAT">STAT</option>
+                                    <option value="Urgent">Urgent</option>
+                                    <option value="Routine">Routine</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="departmentFilter" class="form-label">Department</label>
+                                <select class="form-select" id="departmentFilter">
+                                    <option value="">All Departments</option>
+                                    <option value="Hematology">Hematology</option>
+                                    <option value="Chemistry">Chemistry</option>
+                                    <option value="Microbiology">Microbiology</option>
+                                    <option value="Immunology">Immunology</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="searchPatient" class="form-label">Patient Search</label>
+                                <input type="text" class="form-control" id="searchPatient" placeholder="Patient name or MRN">
+                            </div>
+
+                            <button class="btn btn-primary w-100" onclick="applyFilters()">
+                                <i class="fas fa-search me-2"></i>Apply Filters
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Orders Table -->
+                    <div class="col-md-9">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Lab Orders</h5>
+                                <button class="btn btn-outline-primary" onclick="exportOrders()">
+                                    <i class="fas fa-download me-2"></i>Export
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Order ID</th>
+                                                <th>Patient Info</th>
+                                                <th>Test Details</th>
+                                                <th>Priority</th>
+                                                <th>Status</th>
+                                                <th>TAT</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ordersTable">
+                                            <!-- Orders will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Pagination -->
+                                <nav aria-label="Orders pagination">
+                                    <ul class="pagination justify-content-center" id="pagination">
+                                        <!-- Pagination will be populated here -->
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Order Tab -->
+            <div class="tab-pane fade" id="create" role="tabpanel" aria-labelledby="create-tab">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-plus me-2"></i>Create New Lab Order
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="newOrderForm">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="patientMRN" class="form-label">Patient MRN *</label>
+                                            <input type="text" class="form-control" id="patientMRN" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="patientName" class="form-label">Patient Name *</label>
+                                            <input type="text" class="form-control" id="patientName" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="testType" class="form-label">Test Type *</label>
+                                            <select class="form-select" id="testType" required>
+                                                <option value="">Select Test Type</option>
+                                                <option value="CBC">Complete Blood Count (CBC)</option>
+                                                <option value="BMP">Basic Metabolic Panel (BMP)</option>
+                                                <option value="CMP">Comprehensive Metabolic Panel (CMP)</option>
+                                                <option value="Lipid Panel">Lipid Panel</option>
+                                                <option value="Thyroid Panel">Thyroid Function Tests</option>
+                                                <option value="Liver Panel">Liver Function Tests</option>
+                                                <option value="Cardiac Markers">Cardiac Markers</option>
+                                                <option value="Coagulation">Coagulation Studies</option>
+                                                <option value="Urinalysis">Urinalysis</option>
+                                                <option value="Blood Culture">Blood Culture</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="priority" class="form-label">Priority *</label>
+                                            <select class="form-select" id="priority" required>
+                                                <option value="Routine">Routine</option>
+                                                <option value="Urgent">Urgent</option>
+                                                <option value="STAT">STAT</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="orderingPhysician" class="form-label">Ordering Physician *</label>
+                                            <select class="form-select" id="orderingPhysician" required>
+                                                <option value="">Select Physician</option>
+                                                <option value="Dr. Johnson">Dr. Johnson</option>
+                                                <option value="Dr. Smith">Dr. Smith</option>
+                                                <option value="Dr. Williams">Dr. Williams</option>
+                                                <option value="Dr. Brown">Dr. Brown</option>
+                                                <option value="Dr. Davis">Dr. Davis</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="department" class="form-label">Department</label>
+                                            <select class="form-select" id="department">
+                                                <option value="Emergency Department">Emergency Department</option>
+                                                <option value="ICU">ICU</option>
+                                                <option value="Medical Ward">Medical Ward</option>
+                                                <option value="Surgical Ward">Surgical Ward</option>
+                                                <option value="Outpatient">Outpatient</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="clinicalIndication" class="form-label">Clinical Indication</label>
+                                        <textarea class="form-control" id="clinicalIndication" rows="3" 
+                                                placeholder="Brief clinical indication for the test..."></textarea>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="specimenType" class="form-label">Specimen Type</label>
+                                            <select class="form-select" id="specimenType">
+                                                <option value="Blood">Blood</option>
+                                                <option value="Serum">Serum</option>
+                                                <option value="Plasma">Plasma</option>
+                                                <option value="Urine">Urine</option>
+                                                <option value="CSF">CSF</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="collectionDate" class="form-label">Collection Date</label>
+                                            <input type="datetime-local" class="form-control" id="collectionDate">
+                                        </div>
+                                    </div>
+
+                                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                        <button type="button" class="btn btn-secondary" onclick="resetForm()">
+                                            <i class="fas fa-undo me-2"></i>Reset
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-2"></i>Create Order
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div class="tab-pane fade" id="analytics" role="tabpanel" aria-labelledby="analytics-tab">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Orders by Department</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="departmentChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">TAT Performance</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="tatChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Orders Trend (Last 30 Days)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container" style="height: 400px;">
+                                    <canvas id="trendChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
