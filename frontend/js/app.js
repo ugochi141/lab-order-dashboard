@@ -5,7 +5,6 @@
 
 class LabOrderDashboard {
     constructor() {
-        this.baseURL = 'http://localhost:3000/api';
         this.currentPage = 1;
         this.pageSize = 10;
         this.charts = {};
@@ -44,18 +43,8 @@ class LabOrderDashboard {
     }
 
     async loadOrders() {
-        try {
-            const response = await fetch(`${this.baseURL}/orders`);
-            if (response.ok) {
-                this.orders = await response.json();
-            } else {
-                throw new Error('API not available');
-            }
-        } catch (error) {
-            console.log('Using mock data - API not available');
-            this.orders = this.generateMockOrders();
-        }
-        
+        // Static-demo mode: use generated mock data (no backend deployed)
+        this.orders = this.generateMockOrders();
         this.filteredOrders = [...this.orders];
         this.updateOrdersTable();
         this.updateRecentOrdersTable();
@@ -436,30 +425,23 @@ class LabOrderDashboard {
             collection_date: formData.get('collectionDate')
         };
 
-        try {
-            const response = await fetch(`${this.baseURL}/orders`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(orderData)
-            });
+        // Static-demo mode: push into in-memory orders array (no backend)
+        const nextId = `ORD${String(this.orders.length + 1).padStart(8, '0')}`;
+        this.orders.unshift({
+            order_id: nextId,
+            ...orderData,
+            status: 'Pending',
+            order_date: new Date().toISOString(),
+        });
+        this.filteredOrders = [...this.orders];
+        this.updateOrdersTable();
+        this.updateRecentOrdersTable();
+        this.showAlert('Order created (demo mode)', 'success');
+        document.getElementById('newOrderForm').reset();
 
-            if (response.ok) {
-                this.showAlert('Order created successfully!', 'success');
-                document.getElementById('newOrderForm').reset();
-                await this.loadOrders();
-                
-                // Switch to orders tab
-                const ordersTab = new bootstrap.Tab(document.getElementById('orders-tab'));
-                ordersTab.show();
-            } else {
-                throw new Error('Failed to create order');
-            }
-        } catch (error) {
-            console.error('Error creating order:', error);
-            this.showAlert('Error creating order. Please try again.', 'danger');
-        }
+        // Switch to orders tab
+        const ordersTab = new bootstrap.Tab(document.getElementById('orders-tab'));
+        ordersTab.show();
     }
 
     applyFilters() {
